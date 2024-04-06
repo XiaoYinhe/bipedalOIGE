@@ -96,7 +96,7 @@ class RLExtension(omni.ext.IExt):
         self._task_map, _ = import_tasks()
         self._task_list = list(self._task_map.keys())
         self._task_list.sort()
-        self._task_list.remove("CartpoleCamera") # we cannot run camera-based training from extension workflow for now. it requires a specialized app file.
+        # self._task_list.remove("CartpoleCamera") # we cannot run camera-based training from extension workflow for now. it requires a specialized app file.
         self._task_name = self._task_list[0]
         self._parse_config(self._task_name)
         self._update_task_file_paths(self._task_name)

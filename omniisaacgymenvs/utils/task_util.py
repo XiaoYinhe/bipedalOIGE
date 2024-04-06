@@ -45,6 +45,7 @@ def import_tasks():
     from omniisaacgymenvs.tasks.ingenuity import IngenuityTask
     from omniisaacgymenvs.tasks.quadcopter import QuadcopterTask
     from omniisaacgymenvs.tasks.shadow_hand import ShadowHandTask
+    from omniisaacgymenvs.tasks.bipedal import BipedalTask
 
     from omniisaacgymenvs.tasks.warp.ant import AntLocomotionTask as AntLocomotionTaskWarp
     from omniisaacgymenvs.tasks.warp.cartpole import CartpoleTask as CartpoleTaskWarp
@@ -52,31 +53,34 @@ def import_tasks():
 
     # Mappings from strings to environments
     task_map = {
-        "AllegroHand": AllegroHandTask,
-        "Ant": AntLocomotionTask,
-        "Anymal": AnymalTask,
-        "AnymalTerrain": AnymalTerrainTask,
-        "BallBalance": BallBalanceTask,
-        "Cartpole": CartpoleTask,
-        "CartpoleCamera": CartpoleCameraTask,
-        "FactoryTaskNutBoltPick": FactoryTaskNutBoltPick,
-        "FactoryTaskNutBoltPlace": FactoryTaskNutBoltPlace,
-        "FactoryTaskNutBoltScrew": FactoryTaskNutBoltScrew,
-        "FrankaCabinet": FrankaCabinetTask,
-        "FrankaDeformable": FrankaDeformableTask,
-        "Humanoid": HumanoidLocomotionTask,
-        "Ingenuity": IngenuityTask,
-        "Quadcopter": QuadcopterTask,
-        "Crazyflie": CrazyflieTask,
-        "ShadowHand": ShadowHandTask,
-        "ShadowHandOpenAI_FF": ShadowHandTask,
-        "ShadowHandOpenAI_LSTM": ShadowHandTask,
+        # "AllegroHand": AllegroHandTask,
+        # "Ant": AntLocomotionTask,
+        # "Anymal": AnymalTask,
+        # "AnymalTerrain": AnymalTerrainTask,
+        # "BallBalance": BallBalanceTask,
+        # "Cartpole": CartpoleTask,
+        # "CartpoleCamera": CartpoleCameraTask,
+        # "Motor": MotorTask,
+        # "Balance": BalanceTask,
+        "Bipedal": BipedalTask,
+        # "FactoryTaskNutBoltPick": FactoryTaskNutBoltPick,
+        # "FactoryTaskNutBoltPlace": FactoryTaskNutBoltPlace,
+        # "FactoryTaskNutBoltScrew": FactoryTaskNutBoltScrew,
+        # "FrankaCabinet": FrankaCabinetTask,
+        # "FrankaDeformable": FrankaDeformableTask,
+        # "Humanoid": HumanoidLocomotionTask,
+        # "Ingenuity": IngenuityTask,
+        # "Quadcopter": QuadcopterTask,
+        # "Crazyflie": CrazyflieTask,
+        # "ShadowHand": ShadowHandTask,
+        # "ShadowHandOpenAI_FF": ShadowHandTask,
+        # "ShadowHandOpenAI_LSTM": ShadowHandTask,
     }
 
     task_map_warp = {
-        "Cartpole": CartpoleTaskWarp,
-        "Ant":AntLocomotionTaskWarp,
-        "Humanoid": HumanoidLocomotionTaskWarp
+        # "Cartpole": CartpoleTaskWarp,
+        # "Ant":AntLocomotionTaskWarp,
+        # "Humanoid": HumanoidLocomotionTaskWarp
     }
 
     return task_map, task_map_warp
