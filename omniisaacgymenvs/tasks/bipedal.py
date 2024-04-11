@@ -10,7 +10,10 @@ from omni.isaac.core.articulations import ArticulationView
 from omniisaacgymenvs.robots.articulations.bipedal import Bipedal
 from omniisaacgymenvs.tasks.utils.usd_utils import set_drive
 
-
+from omni.isaac.core.utils.extensions import enable_extension
+enable_extension("omni.replicator.isaac")
+import omni.replicator.core as oc
+import omni.replicator.isaac as dr
 
 
 class BipedalTask(RLTask):
@@ -79,7 +82,13 @@ class BipedalTask(RLTask):
             self.rew_scales[key] *= self.dt
 
         self._num_envs = self._task_cfg["env"]["numEnvs"]
-        self._robot_translation = torch.tensor([0.0, 0.0, 0.1936+0.05])
+        # self._robot_translation = torch.tensor([0.0, 0.0, 0.1884+0.01])
+        # quat_ang = quat_from_euler_xyz(torch.tensor(0),torch.tensor(0.568),torch.tensor(0))
+        self._robot_translation = torch.tensor([0.0, 0.0, 0.1923+0.01])
+        quat_ang = quat_from_euler_xyz(torch.tensor(0),torch.tensor(0),torch.tensor(0))
+        
+        self._robot_orientation = quat_ang
+        
         self._env_spacing = self._task_cfg["env"]["envSpacing"]
 
     def set_up_scene(self, scene) -> None:
@@ -98,7 +107,8 @@ class BipedalTask(RLTask):
     def get_robot(self):
         print(self.default_zero_env_path)
         robot = Bipedal(
-            prim_path=self.default_zero_env_path + "/Robot", name="Robot", translation=self._robot_translation
+            prim_path=self.default_zero_env_path + "/Robot", name="Robot", translation=self._robot_translation,
+            orientation=self._robot_orientation
         )
 
         # applies articulation settings from the task configuration yaml file
@@ -109,11 +119,11 @@ class BipedalTask(RLTask):
           # Configure joint properties
         hip_joint_paths = ["lhipJoint","rhipJoint"]
         for joint_path in hip_joint_paths:
-            set_drive(f"{robot.prim_path}/{joint_path}", "angular", "position", 0, 400, 40, 150)
+            set_drive(f"{robot.prim_path}/{joint_path}", "angular", "position", 0, 80, 30, 150)
 
         ctrl_joint_paths = ["lf1Joint","lb1Joint","rf1Joint","rb1Joint"]
         for joint_path in ctrl_joint_paths:
-            set_drive(f"{robot.prim_path}/{joint_path}", "angular", "position", 0, 400, 40, 40)
+            set_drive(f"{robot.prim_path}/{joint_path}", "angular", "position", 0, 80, 30, 40)
 
         # other_joint_paths = ["lf2Joint","lb2Joint","lfootJoint","rf2Joint","rb2Joint","rfootJoint"]
         # for joint_path in other_joint_paths:
@@ -133,11 +143,11 @@ class BipedalTask(RLTask):
         ang_acc_w = quat_rotate_inverse(torso_rotation, ang_acc_b) 
         self.last_vel = root_velocities
 
-        # base_lin_vel = quat_rotate_inverse(torso_rotation, velocity) * self.lin_vel_scale
-        
-        # base_ang_vel = quat_rotate_inverse(torso_rotation, ang_velocity) * self.ang_vel_scale
+        velocity = root_velocities[:, 0:3]
+        ang_velocity = root_velocities[:, 3:6]
+        base_lin_vel = quat_rotate_inverse(torso_rotation, velocity) * self.lin_vel_scale
+        base_ang_vel = quat_rotate_inverse(torso_rotation, ang_velocity) * self.ang_vel_scale
 
-        
         projected_gravity = quat_rotate(torso_rotation, self.gravity_vec)
         commands_scaled = self.commands * torch.tensor(
             [self.lin_vel_scale, self.lin_vel_scale, self.ang_vel_scale],
@@ -147,10 +157,10 @@ class BipedalTask(RLTask):
         # print(acc)
         obs = torch.cat(
             (
-                # base_lin_vel,   
-                # base_ang_vel,
-                lin_acc_w,
-                ang_acc_w,
+                base_lin_vel,   
+                base_ang_vel,
+                # lin_acc_w,
+                # ang_acc_w,
                 projected_gravity,
                 commands_scaled,
                 dof_pos * self.dof_pos_scale,
@@ -194,7 +204,6 @@ class BipedalTask(RLTask):
         # randomize DOF velocities
         dof_pos = torch.zeros((num_resets, self._robots.num_dof), device=self._device)
         dof_vel = torch.zeros((num_resets, self._robots.num_dof), device=self._device)
-
         self.current_targets[env_ids] = dof_pos[:,self.ctrl_dof_idx]
 
         # lin_vel and ang_vel
@@ -205,6 +214,10 @@ class BipedalTask(RLTask):
         self._robots.set_joint_positions(dof_pos, indices)
         self._robots.set_joint_velocities(dof_vel, indices)
 
+
+        # self._robot_translation = torch.tensor([0.0, 0.0, 0.1923+0.01])
+        # quat_ang = quat_from_euler_xyz(torch.tensor(0),torch.tensor(0),torch.tensor(0))
+        
         self._robots.set_world_poses(
             self.initial_root_pos[env_ids].clone(), self.initial_root_rot[env_ids].clone(), indices
         )
@@ -300,36 +313,30 @@ class BipedalTask(RLTask):
         rew_action_rate = (
             torch.sum(torch.square(self.last_actions - self.actions), dim=1) * self.rew_scales["action_rate"]
         )
+        projected_gravity = quat_rotate(torso_rotation, self.gravity_vec)
+        # rwd_height = 0.01 * torch.exp(torso_position[:,2])
+        # rwd_height += 0.01 * torch.exp(-torch.abs(projected_gravity[:,0]))
+        # rwd_height += 0.01 * torch.exp(-torch.abs(projected_gravity[:,1]))
+        
         # rew_cosmetic = (
-        #     torch.sum(torch.abs(dof_pos[:, 0:4] - self.default_dof_pos[:, 0:4]), dim=1) * self.rew_scales["cosmetic"]
+        #     torch.sum(torch.abs(dof_pos[:, 0:4]), dim=1) * self.rew_scales["cosmetic"]
         # )
 
-        total_reward = rew_lin_vel_xy + rew_ang_vel_z + rew_joint_acc + rew_action_rate  + rew_lin_vel_z
+        total_reward = rew_lin_vel_xy + rew_ang_vel_z + rew_joint_acc + rew_action_rate  + rew_lin_vel_z #+rwd_height
         total_reward = torch.clip(total_reward, 0.0, None)
 
         self.last_actions[:] = self.actions[:]
         self.last_dof_vel[:] = dof_vel_sel[:]
 
-        projected_gravity = quat_rotate(torso_rotation, self.gravity_vec)
         # print(projected_gravity)
-        fall_side =  torch.where(torch.abs(projected_gravity[:,0]) > 0.3, 1, 0) 
-        fall_side = torch.where(torch.abs(projected_gravity[:,1]) > 0.3, 1, fall_side)
 
-        self.fallen_over = self.is_base_below_threshold(threshold=0.24, ground_heights=0.0) | fall_side
+        fall_side1 = torch.where(torch.abs(projected_gravity[:,0]) > 0.35, 1, 0) 
+        fall_side1 = torch.where(torch.abs(projected_gravity[:,1]) > 0.35, 1, fall_side1)
+        
+        self.fallen_over = self.is_base_below_threshold(threshold=0.2, ground_heights=0.0) | fall_side1
 
-        total_reward[torch.nonzero(self.fallen_over)] = -1
         # print(torch.sum(total_reward).to(torch.float))
-        
-
-        # 记录
-        self.rwd_value_wh += torch.sum(total_reward).to(torch.float).item()
-        self.calt_cnt +=1
-        if self.calt_cnt > 0 and self.calt_cnt%20 == 0 :
-            avg_rwd = self.max_episode_length * self.rwd_value_wh/(20*self.num_envs)
-            print(avg_rwd)
-            
-            self.rwd_value_wh =0
-        
+        total_reward[torch.nonzero(self.fallen_over)] = -1
         self.rew_buf[:] = total_reward.detach()
 
     def is_base_below_threshold(self, threshold, ground_heights):
