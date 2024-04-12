@@ -58,7 +58,7 @@ def import_tasks():
         # "Anymal": AnymalTask,
         # "AnymalTerrain": AnymalTerrainTask,
         # "BallBalance": BallBalanceTask,
-        # "Cartpole": CartpoleTask,
+        "Cartpole": CartpoleTask,
         # "CartpoleCamera": CartpoleCameraTask,
         # "Motor": MotorTask,
         # "Balance": BalanceTask,
