@@ -10,7 +10,7 @@ env:
   clipObservations: 5.0
   clipActions: 1.0
 
-  controlFrequencyInv: 2
+  controlFrequencyInv: 1
 
   baseInitState:
     pos: [0.0, 0.0, 0.62] # x,y,z [m]
@@ -27,7 +27,7 @@ env:
     # PD Drive parameters:
     stiffness: 80.0  # [N*m/rad]
     damping: 10.0     # [N*m*s/rad]
-    actionScale: 20
+    actionScale: 15
 
   defaultJointAngles:  # = target angles when action = 0.0
     lhipJoint: 0    # [rad]
@@ -39,12 +39,15 @@ env:
 
   learn:
     # rewards
-    linearVelocityXYRewardScale: 1.2
-    angularVelocityZRewardScale: 0.4
-    linearVelocityZRewardScale: -0.03
-    jointAccRewardScale: -0.0003
-    actionRateRewardScale: -0.006
-    cosmeticRewardScale: -0.06
+    linearVelocityXYRewardScale: 0.1
+    angularVelocityZRewardScale: 0.05
+    linearVelocityZRewardScale: -0.02
+    jointAccRewardScale: -0.008
+    actionRateRewardScale: -0.02
+    cosmeticRewardScale: -0.01
+    heightRewardScale: 0.07
+    rollRewardScale: 0.02
+    pitchRewardScale: 0.02
 
     # normalization
     linearVelocityScale: 2.0
@@ -53,10 +56,10 @@ env:
     dofVelocityScale: 0.05
 
     # episode length in seconds
-    episodeLength_s: 10
+    episodeLength_s: 5
 
 sim:
-  dt: 0.01
+  dt: 0.01 #100Hz
   use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
   gravity: [0.0, 0.0, -9.81]
   add_ground_plane: True
@@ -146,7 +149,7 @@ domain_randomization:
           frequency_interval: 720
           operation: "additive"
           distribution: "gaussian"
-          distribution_parameters: [[0.0, 0.0, -0.4], [0.0, 0.0, 0.4]]
+          distribution_parameters: [[0.0, 0.0, 0], [0.1, 0.1, 0.4]]
     # rigid_prim_views:
     #   object_view:
     #     material_properties:
