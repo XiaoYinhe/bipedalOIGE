@@ -55,8 +55,8 @@ def import_tasks():
     task_map = {
         # "AllegroHand": AllegroHandTask,
         # "Ant": AntLocomotionTask,
-        # "Anymal": AnymalTask,
-        # "AnymalTerrain": AnymalTerrainTask,
+        "Anymal": AnymalTask,
+        "AnymalTerrain": AnymalTerrainTask,
         # "BallBalance": BallBalanceTask,
         "Cartpole": CartpoleTask,
         # "CartpoleCamera": CartpoleCameraTask,

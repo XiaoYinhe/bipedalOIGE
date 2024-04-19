@@ -40,11 +40,11 @@ env:
   learn:
     # rewards
     linearVelocityXYRewardScale: 0.1
-    angularVelocityZRewardScale: 0.05
+    angularVelocityZRewardScale: 0.1
     linearVelocityZRewardScale: -0.02
     jointAccRewardScale: -0.008
-    actionRateRewardScale: -0.02
-    cosmeticRewardScale: -0.01
+    actionRateRewardScale: -0.08
+    cosmeticRewardScale: -0.05
     heightRewardScale: 0.07
     rollRewardScale: 0.02
     pitchRewardScale: 0.02

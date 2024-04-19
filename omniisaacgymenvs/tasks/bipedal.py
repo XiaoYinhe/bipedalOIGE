@@ -29,7 +29,7 @@ class BipedalTask(RLTask):
 
         RLTask.__init__(self, name, env)
 
-
+        self.csv_enable = False
         self.calt_cnt =-100
         self.rwd_value_wh =0
         torch_zeros = lambda: torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)
@@ -45,18 +45,19 @@ class BipedalTask(RLTask):
             "cosmetic": torch_zeros(),
         }
         # 写入CSV文件
-        # csvfile = open("yhtest1.csv", 'w', newline='', encoding='utf-8') 
-        # self.csv_writer = csv.writer(csvfile)
-        # column_name = ["time",
-        #                "lin_velX","lin_velY","lin_velZ",
-        #                "ang_velX","ang_velY","ang_velZ",
-        #                "graX","graY","graZ",
-        #                "cmdX","cmdY","cmdZ",
-        #                "pos1","pos2","pos3","pos4","pos5","pos6",
-        #                "vel1","vel2","vel3","vel4","vel5","vel6",
-        #                "out1","out2","out3","out4","out5","out6"]
-        # # 写入表头（如果有多个列的话，这里会是多个列名）
-        # self.csv_writer.writerow(column_name)
+        if self.csv_enable : 
+            csvfile = open("yhtest_balance_04141542.csv", 'w', newline='', encoding='utf-8') 
+            self.csv_writer = csv.writer(csvfile)
+            column_name = ["time",
+                        "lin_velX","lin_velY","lin_velZ",
+                        "ang_velX","ang_velY","ang_velZ",
+                        "graX","graY","graZ",
+                        "cmdX","cmdY","cmdZ",
+                        "pos1","pos2","pos3","pos4","pos5","pos6",
+                        "vel1","vel2","vel3","vel4","vel5","vel6",
+                        "out1","out2","out3","out4","out5","out6"]
+            # 写入表头（如果有多个列的话，这里会是多个列名）
+            self.csv_writer.writerow(column_name)
         return
 
     def update_config(self, sim_config):
@@ -135,6 +136,13 @@ class BipedalTask(RLTask):
         )
         scene.add(self._robots)
 
+        self.foot_l = ArticulationView(
+            prim_paths_expr="/World/envs/.*/Robot/footl", name="lfoot_view", reset_xform_properties=False
+        )
+        self.foot_r = ArticulationView(
+            prim_paths_expr="/World/envs/.*/Robot/footr", name="lfoot_view", reset_xform_properties=False
+        )
+
 
         if self._dr_randomizer.randomize:
             self._dr_randomizer.apply_on_startup_domain_randomization(self)
@@ -153,7 +161,7 @@ class BipedalTask(RLTask):
             "Robot", get_prim_at_path(robot.prim_path), self._sim_config.parse_actor_config("Robot")
         )
 
-          # Configure joint properties
+        # Configure joint properties
         # hip_joint_paths = ["lhipJoint","rhipJoint"]
         # for joint_path in hip_joint_paths:
         #     set_drive(f"{robot.prim_path}/{joint_path}", "angular", "position", 0, self.Kp, self.Kd, 150)
@@ -199,16 +207,17 @@ class BipedalTask(RLTask):
             ),
             dim=-1,
         )
+        # print(f"{torso_position[0][2]}")
+        if self.csv_enable : 
+            data_list = torch.cat(
+                (
+                    self.progress_buf,
+                    obs[0],
+                ),
+                dim=-1,
+            )
         
-        # data_list = torch.cat(
-        #     (
-        #         self.progress_buf,
-        #         obs[0],
-        #     ),
-        #     dim=-1,
-        # )
-       
-        # self.csv_writer.writerow(data_list.tolist())
+            self.csv_writer.writerow(data_list.tolist())
         self.obs_buf[:] = obs
 
         observations = {self._robots.name: {"obs_buf": self.obs_buf}}
@@ -232,7 +241,7 @@ class BipedalTask(RLTask):
         # current_targets[reset_env_ids] = 0
 
         indices = torch.arange(self._robots.count, dtype=torch.int32, device=self._device)
-        testSetPos = self.action_scale * self.actions
+        testSetPos = self.action_scale * self.actions 
 
         # testSetPos[:] = tensor_clamp(
         #     testSetPos, self.anymal_dof_lower_limits, self.anymal_dof_upper_limits
@@ -240,7 +249,8 @@ class BipedalTask(RLTask):
         # testSetPos[:] = tensor_clamp(
         #     testSetPos, -30, 30
         # )
-        
+        # testSetPos[0] = torch.tensor([0,15,-15,0,15,-15],dtype=torch.int32, device=self._device)
+        # print(testSetPos[0])
         self._robots.set_joint_efforts(testSetPos, indices,self.ctrl_dof_idx)
 
         reset_buf = self.reset_buf.clone()
@@ -269,7 +279,6 @@ class BipedalTask(RLTask):
         indices = env_ids.to(dtype=torch.int32)
         self._robots.set_joint_positions(dof_pos, indices)
         self._robots.set_joint_velocities(dof_vel, indices)
-
 
         # self._robot_translation = torch.tensor([0.0, 0.0, 0.1923+0.01])
         # quat_ang = quat_from_euler_xyz(torch.tensor(0),torch.tensor(0),torch.tensor(0))
@@ -310,6 +319,7 @@ class BipedalTask(RLTask):
         self.ctrl_dof_idx = torch.tensor(
             [self._robots._dof_indices[j] for j in ctrl_dof_paths], device=self._device, dtype=torch.long
         )
+        print(f"self.ctrl_dof_idx:{self.ctrl_dof_idx}")
         self.initial_root_pos, self.initial_root_rot = self._robots.get_world_poses()
 
         dof_limits = self._robots.get_dof_limits().to(self._device)
@@ -323,6 +333,10 @@ class BipedalTask(RLTask):
         self.commands_y = self.commands.view(self._num_envs, 3)[..., 1]
         self.commands_x = self.commands.view(self._num_envs, 3)[..., 0]
         self.commands_yaw = self.commands.view(self._num_envs, 3)[..., 2]
+        
+
+        self.last_foot_pos_l,t1 = self.foot_l.get_world_poses()
+        self.last_foot_pos_r,t2 = self.foot_r.get_world_poses()
 
         # initialize some data used later on
         self.extras = {}
@@ -409,17 +423,34 @@ class BipedalTask(RLTask):
         max_height = torch.ones_like(self.progress_buf) * 0.35
         min_setHeight = torch.where(min_setHeight < max_height,min_setHeight,0.35)
 
-        joint_ang_outlimit = torch.where(torch.abs(dof_pos_sel[:,0]) > 1.5,1,0)
-        joint_ang_outlimit = torch.where(torch.abs(dof_pos_sel[:,1]) > 1.5,1,joint_ang_outlimit)
-        joint_ang_outlimit = torch.where(torch.abs(dof_pos_sel[:,2]) > 1.5,1,joint_ang_outlimit)
-        joint_ang_outlimit = torch.where(torch.abs(dof_pos_sel[:,3]) > 1.5,1,joint_ang_outlimit)
-        joint_ang_outlimit = torch.where(torch.abs(dof_pos_sel[:,4]) > 1.5,1,joint_ang_outlimit)
-        joint_ang_outlimit = torch.where(torch.abs(dof_pos_sel[:,5]) > 1.5,1,joint_ang_outlimit)
+
+        footPosl,_ = self.foot_l.get_world_poses(clone=False)
+        footPosr,_ = self.foot_r.get_world_poses(clone=False)
+        foot_pos_err = torch.cat(
+            (
+                footPosl - self.last_foot_pos_l,
+                footPosr - self.last_foot_pos_r,
+            ),
+            dim=-1,
+        )
+        foot_pos_err = torch.abs(foot_pos_err)
+        foot_move_all = foot_pos_err.sum(dim=1)
+        foot_move = torch.where(foot_move_all>0.1,1,0)
+        # print(foot_move)
+
+        # print()
+        # print(footPosl)
+        joint_ang_outlimit = torch.where(torch.square(dof_pos_sel[:,0]) > 1.5,1,0)
+        joint_ang_outlimit = torch.where(torch.square(dof_pos_sel[:,1]) > 1.5,1,joint_ang_outlimit)
+        joint_ang_outlimit = torch.where(torch.square(dof_pos_sel[:,2]) > 1.5,1,joint_ang_outlimit)
+        joint_ang_outlimit = torch.where(torch.square(dof_pos_sel[:,3]) > 1.5,1,joint_ang_outlimit)
+        joint_ang_outlimit = torch.where(torch.square(dof_pos_sel[:,4]) > 1.5,1,joint_ang_outlimit)
+        joint_ang_outlimit = torch.where(torch.square(dof_pos_sel[:,5]) > 1.5,1,joint_ang_outlimit)
 
         fall_side1 = torch.where(torch.abs(torso_position[:,2]) < min_setHeight, 1, 0)
         fall_side1 = torch.where(torch.abs(projected_gravity[:,0]) > torso_position[:, 2], 1, fall_side1) 
         fall_side1 = torch.where(torch.abs(projected_gravity[:,1]) > torso_position[:, 2], 1, fall_side1)
-        self.fallen_over = self.is_base_below_threshold(threshold=0.19, ground_heights=0.0) | fall_side1 |joint_ang_outlimit
+        self.fallen_over = self.is_base_below_threshold(threshold=0.19, ground_heights=0.0) | fall_side1 |joint_ang_outlimit|foot_move
         # print(torch.sum(total_reward).to(torch.float))
         total_reward[torch.nonzero(self.fallen_over)] = -1
         self.rew_buf[:] = total_reward.detach()
