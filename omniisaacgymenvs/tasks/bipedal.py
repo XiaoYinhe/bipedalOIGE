@@ -420,23 +420,8 @@ class BipedalTask(RLTask):
 
         # print(projected_gravity)
         min_setHeight =  self.progress_buf*self.dt*0.2 + 0.2
-        max_height = torch.ones_like(self.progress_buf) * 0.35
+        max_height = torch.ones_like(self.progress_buf) * 0.3
         min_setHeight = torch.where(min_setHeight < max_height,min_setHeight,0.35)
-
-
-        footPosl,_ = self.foot_l.get_world_poses(clone=False)
-        footPosr,_ = self.foot_r.get_world_poses(clone=False)
-        foot_pos_err = torch.cat(
-            (
-                footPosl - self.last_foot_pos_l,
-                footPosr - self.last_foot_pos_r,
-            ),
-            dim=-1,
-        )
-        foot_pos_err = torch.abs(foot_pos_err)
-        foot_move_all = foot_pos_err.sum(dim=1)
-        foot_move = torch.where(foot_move_all>0.1,1,0)
-        # print(foot_move)
 
         # print()
         # print(footPosl)
@@ -450,7 +435,7 @@ class BipedalTask(RLTask):
         fall_side1 = torch.where(torch.abs(torso_position[:,2]) < min_setHeight, 1, 0)
         fall_side1 = torch.where(torch.abs(projected_gravity[:,0]) > torso_position[:, 2], 1, fall_side1) 
         fall_side1 = torch.where(torch.abs(projected_gravity[:,1]) > torso_position[:, 2], 1, fall_side1)
-        self.fallen_over = self.is_base_below_threshold(threshold=0.19, ground_heights=0.0) | fall_side1 |joint_ang_outlimit|foot_move
+        self.fallen_over = self.is_base_below_threshold(threshold=0.19, ground_heights=0.0) | fall_side1 |joint_ang_outlimit
         # print(torch.sum(total_reward).to(torch.float))
         total_reward[torch.nonzero(self.fallen_over)] = -1
         self.rew_buf[:] = total_reward.detach()
