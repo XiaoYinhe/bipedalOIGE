@@ -57,7 +57,7 @@ def import_tasks():
         # "AllegroHand": AllegroHandTask,
         # "Ant": AntLocomotionTask,
         # "Anymal": AnymalTask,
-        "AnymalTerrain": AnymalTerrainTask,
+        # "AnymalTerrain": AnymalTerrainTask,
         # "BallBalance": BallBalanceTask,
         "Cartpole": CartpoleTask,
         # "CartpoleCamera": CartpoleCameraTask,

@@ -3,7 +3,7 @@ name: BipedalTerrain
 physics_engine: ${..physics_engine}
 
 env:
-  numEnvs: ${resolve_default:1024,${...num_envs}}
+  numEnvs: ${resolve_default:1000,${...num_envs}}
   numObservations: 30
   numActions: 6
   envSpacing: 3.  # [m]
@@ -17,15 +17,15 @@ env:
     maxInitMapLevel: 0
     mapLength: 8.
     mapWidth: 8.
-    numLevels: 10
+    numLevels: 20
     numTerrains: 20
     # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete]
-    terrainProportions: [0.1, 0.1, 0.35, 0.25, 0.2]
+    terrainProportions: [0.2, 0.1, 0.35, 0.25, 0.2]
     # tri mesh only:
     slopeTreshold: 0.5
 
   baseInitState:
-    pos: [0.0, 0.0, 0.62] # x,y,z [m]
+    pos: [0.0, 0.0, 0.225] # x,y,z [m]
     rot: [1.0, 0.0, 0.0, 0.0] # w,x,y,z [quat]
     vLinear: [0.0, 0.0, 0.0]  # x,y,z [m/s]
     vAngular: [0.0, 0.0, 0.0]  # x,y,z [rad/s]
@@ -38,13 +38,18 @@ env:
 
   control:
     # PD Drive parameters:
-    stiffness: 80.0  # [N*m/rad]
-    damping: 2.0     # [N*m*s/rad]
+    stiffness: 15.0  # [N*m/rad]
+    damping: 10.0     # [N*m*s/rad]
     # action scale: target angle = actionScale * action + defaultAngle
-    actionScale: 0.5
+    actionScale: 1
     # decimation: Number of control action updates @ sim DT per policy DT
     decimation: 4
     maxtorque: 40
+
+    kpRand: 3
+    kdRand: 1
+    maxtorqueRand: 5.0
+    outRand: 0.3
 
 
 
@@ -61,6 +66,7 @@ env:
     baseHeightRewardScale: -0.0
     actionRateRewardScale: -0.01
     fallenOverRewardScale: -1.0
+    stepFreRewardScale: 0.4
     # cosmetics
     hipRewardScale: -0. #25
 
@@ -83,9 +89,6 @@ env:
    
     #randomization
     pushInterval_s: 15
-    kpRand: 10
-    kdRand: 5
-    maxtorqueRand: 5
 
     # episode length in seconds
     episodeLength_s: 20
@@ -125,17 +128,16 @@ sim:
     max_depenetration_velocity: 100.0
 
     # GPU buffers
-    gpu_max_rigid_contact_count: 524288
-    gpu_max_rigid_patch_count: 163840
-    gpu_found_lost_pairs_capacity: 4194304
-    gpu_found_lost_aggregate_pairs_capacity: 33554432
-    gpu_total_aggregate_pairs_capacity: 4194304
+    gpu_max_rigid_contact_count: 1048576
+    gpu_max_rigid_patch_count: 33554432
+    gpu_found_lost_pairs_capacity: 20971520
+    gpu_found_lost_aggregate_pairs_capacity: 20971520
+    gpu_total_aggregate_pairs_capacity: 20971520
     gpu_max_soft_body_contacts: 1048576
     gpu_max_particle_contacts: 1048576
-    gpu_heap_capacity: 134217728
-    gpu_temp_buffer_capacity: 33554432
+    gpu_heap_capacity: 33554432
+    gpu_temp_buffer_capacity: 16777216
     gpu_max_num_partitions: 8
-
 
   bipedal:
     # -1 to use default values
