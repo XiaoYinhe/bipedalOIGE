@@ -1,9 +1,9 @@
-name: BipedalTerrain
+name: MotorTest
 
 physics_engine: ${..physics_engine}
 
 env:
-  numEnvs: ${resolve_default:1000,${...num_envs}}
+  numEnvs: ${resolve_default:1,${...num_envs}}
   numObservations: 30
   numActions: 6
   envSpacing: 3.  # [m]
@@ -98,7 +98,7 @@ sim:
   dt: 0.005
   use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
   gravity: [0.0, 0.0, -9.81]
-  add_ground_plane: False
+  add_ground_plane: True
   add_distant_light: False
   use_fabric: True
   enable_scene_query_support: False
@@ -139,7 +139,7 @@ sim:
     gpu_temp_buffer_capacity: 16777216
     gpu_max_num_partitions: 8
 
-  bipedal:
+  motorTest:
     # -1 to use default values
     override_usd_defaults: False
     enable_self_collisions: True

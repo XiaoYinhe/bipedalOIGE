@@ -47,6 +47,7 @@ def import_tasks():
     from omniisaacgymenvs.tasks.shadow_hand import ShadowHandTask
     from omniisaacgymenvs.tasks.bipedal import BipedalTask
     from omniisaacgymenvs.tasks.bipedal_terrain import BipedalTerrainTask
+    from omniisaacgymenvs.tasks.motor_test import MotorTestTask
 
     from omniisaacgymenvs.tasks.warp.ant import AntLocomotionTask as AntLocomotionTaskWarp
     from omniisaacgymenvs.tasks.warp.cartpole import CartpoleTask as CartpoleTaskWarp
@@ -59,7 +60,8 @@ def import_tasks():
         # "Anymal": AnymalTask,
         # "AnymalTerrain": AnymalTerrainTask,
         # "BallBalance": BallBalanceTask,
-        "Cartpole": CartpoleTask,
+        # "Cartpole": CartpoleTask,
+        # "MotorTest": MotorTestTask,
         # "CartpoleCamera": CartpoleCameraTask,
         # "Motor": MotorTask,
         # "Balance": BalanceTask,
