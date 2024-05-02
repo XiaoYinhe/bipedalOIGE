@@ -119,6 +119,7 @@ class BipedalTerrainTask(RLTask):
         self.kd_rand = self._task_cfg["env"]["control"]["kdRand"]
         self.maxtor_rand = self._task_cfg["env"]["control"]["maxtorqueRand"]
         self.out_rand = self._task_cfg["env"]["control"]["outRand"]
+        self.def_pos_rand = self._task_cfg["env"]["control"]["defPosRand"]
 
         for key in self.rew_scales.keys():
             self.rew_scales[key] *= self.dt
@@ -288,7 +289,7 @@ class BipedalTerrainTask(RLTask):
         self.Kp = torch_rand_float(self.Kp_base-self.kp_rand, self.Kp_base+self.kp_rand, (self.num_envs,1), device=self.device)
         self.Kd = torch_rand_float(self.Kd_base-self.kd_rand, self.Kd_base+self.kd_rand, (self.num_envs,1), device=self.device)
         self.maxtor = torch_rand_float(self.maxtor_base-self.maxtor_rand, self.maxtor_base+self.maxtor_rand, (self.num_envs,1), device=self.device)
-
+        self.def_pos = torch.zeros((self.num_envs, 6), device=self.device)
         indices = torch.arange(self._num_envs, dtype=torch.int64, device=self._device)
         self.reset_idx(indices)
         self.init_done = True
@@ -332,9 +333,10 @@ class BipedalTerrainTask(RLTask):
         )  # set small commands to zero
 
         # PD random
-        self.Kp = 1.32*torch_rand_float(self.Kp_base-self.kp_rand, self.Kp_base+self.kp_rand, (self.num_envs,1), device=self.device)
-        self.Kd = 0.05*torch_rand_float(self.Kd_base-self.kd_rand, self.Kd_base+self.kd_rand, (self.num_envs,1), device=self.device)
-        self.maxtor = torch_rand_float(self.maxtor_base-self.maxtor_rand, self.maxtor_base+self.maxtor_rand, (self.num_envs,1), device=self.device)
+        self.Kp[env_ids] = torch_rand_float(self.Kp_base-self.kp_rand, self.Kp_base+self.kp_rand, (len(env_ids),1), device=self.device)
+        self.Kd[env_ids] = 0.05*torch_rand_float(self.Kd_base-self.kd_rand, self.Kd_base+self.kd_rand, (len(env_ids),1), device=self.device)
+        self.maxtor[env_ids] = torch_rand_float(self.maxtor_base-self.maxtor_rand, self.maxtor_base+self.maxtor_rand, (len(env_ids),1), device=self.device)
+        self.def_pos[env_ids] = torch_rand_float(-self.def_pos_rand, self.def_pos_rand, (len(env_ids),6), device=self.device)
 
         self.last_actions[env_ids] = 0.0
         self.last_dof_vel[env_ids] = 0.0
@@ -366,9 +368,9 @@ class BipedalTerrainTask(RLTask):
         self.env_origins[env_ids] = self.terrain_origins[self.terrain_levels[env_ids], self.terrain_types[env_ids]]
 
     def refresh_dof_state_tensors(self):
-        self.dof_pos = self._robots.get_joint_positions(clone=False)
+        self.dof_pos = self._robots.get_joint_positions(clone=False) 
         self.dof_vel = self._robots.get_joint_velocities(clone=False)
-        self.dof_pos_sel = self.dof_pos[:,self.ctrl_dof_idx]
+        self.dof_pos_sel = self.dof_pos[:,self.ctrl_dof_idx] - self.def_pos
         self.dof_vel_sel = self.dof_vel[:,self.ctrl_dof_idx]
 
 
@@ -382,19 +384,24 @@ class BipedalTerrainTask(RLTask):
             return
 
         self.actions = actions.clone().to(self.device)
-        self.actions[:,0] = torch.clip(0.25*self.actions[:,0],-0.3,0.3)
-        self.actions[:,3] = torch.clip(0.25*self.actions[:,3],-0.3,0.3)
+        self.actions[:,0] = torch.clip(0.25*self.actions[:,0],-0.25,0.25)
+        self.actions[:,3] = torch.clip(0.25*self.actions[:,3],-0.25,0.25)
+        cols_to_clip = [1, 2, 4, 5]
+        self.actions[:,cols_to_clip] = torch.clip(self.actions[:,cols_to_clip],-1,1)
 
+        # print(self.def_pos)
         for i in range(self.decimation):
             if self.world.is_playing():
                 # print(f"pos:{self.dof_pos_sel}")
                 # print(self.Kd)
+                motorTorqueClip = self.maxtor*torch.clip((30-torch.abs(self.dof_vel_sel))/30,0,1)
+                # print(motorTorqueClip)
                 torques = torch.clip(
-                    self.Kp * (self.action_scale * self.actions - self.dof_pos_sel)
+                    self.Kp * (self.action_scale * self.actions + self.def_pos - self.dof_pos_sel)
                     - self.Kd * self.dof_vel_sel
-                    +torch_rand_float(-self.out_rand, self.out_rand, (self.num_envs,1), device=self.device),
-                    -self.maxtor,
-                    self.maxtor,
+                    +torch_rand_float(-self.out_rand, self.out_rand, (self.num_envs,6), device=self.device),
+                    -motorTorqueClip,
+                    motorTorqueClip,
                 )
                 # print(f"vel:{self.dof_vel_sel}")
                 # print(f"torques:{torques}")
@@ -510,8 +517,8 @@ class BipedalTerrainTask(RLTask):
 
         now_time = self.progress_buf.reshape((self.num_envs,1)).expand(-1, 2)
         self.feet_contact_time = torch.where(feet_contact_state_change == 1,now_time,self.feet_contact_time)
-        feet_contact_err = torch.abs(30-torch.abs(torch.clip(self.feet_contact_time[:,0] - self.feet_contact_time[:,1],-60,60)))
-        rew_contact_pre = torch.exp(-feet_contact_err/15.0) * self.rew_scales["contact_pre"]
+        feet_contact_err = torch.abs(80-torch.abs(torch.clip(self.feet_contact_time[:,0] - self.feet_contact_time[:,1],-80,80)))
+        rew_contact_pre = torch.exp(-feet_contact_err/30.0) * self.rew_scales["contact_pre"]
 
         # total reward
         self.rew_buf = (
