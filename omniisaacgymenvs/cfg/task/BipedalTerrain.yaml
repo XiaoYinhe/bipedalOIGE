@@ -25,7 +25,7 @@ env:
     slopeTreshold: 0.5
 
   baseInitState:
-    pos: [0.0, 0.0, 0.225] # x,y,z [m]
+    pos: [0.0, 0.0, 0.255] # x,y,z [m]
     rot: [1.0, 0.0, 0.0, 0.0] # w,x,y,z [quat]
     vLinear: [0.0, 0.0, 0.0]  # x,y,z [m/s]
     vAngular: [0.0, 0.0, 0.0]  # x,y,z [rad/s]
@@ -68,7 +68,7 @@ env:
     baseHeightRewardScale: -0.0
     actionRateRewardScale: -0.01
     fallenOverRewardScale: -1.0
-    stepFreRewardScale: 0.5
+    stepFreRewardScale: 1.0
     # cosmetics
     hipRewardScale: -0. #25
 
@@ -97,7 +97,7 @@ env:
 
 
 sim:
-  dt: 0.0025
+  dt: 0.005
   use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
   gravity: [0.0, 0.0, -9.81]
   add_ground_plane: False
