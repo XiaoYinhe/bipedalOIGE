@@ -3,7 +3,7 @@ name: BipedalTerrain
 physics_engine: ${..physics_engine}
 
 env:
-  numEnvs: ${resolve_default:1000,${...num_envs}}
+  numEnvs: ${resolve_default:200,${...num_envs}}
   numObservations: 30
   numActions: 6
   envSpacing: 3.  # [m]

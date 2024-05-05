@@ -11,10 +11,14 @@ from omniisaacgymenvs.tasks.base.rl_task import RLTask
 from omni.isaac.core.articulations import ArticulationView
 from omniisaacgymenvs.robots.articulations.bipedal import Bipedal
 from omniisaacgymenvs.robots.articulations.views.bipedal_view import BipedalView
+from omni.isaac.core.prims import GeometryPrimView
 
 from omniisaacgymenvs.tasks.utils.anymal_terrain_generator import *
 from omniisaacgymenvs.utils.terrain_utils.terrain_utils import *
 from pxr import UsdLux, UsdPhysics
+
+from omni.isaac.core.objects import VisualCone
+from omni.isaac.core.objects import VisualCylinder
 
 
 class BipedalTerrainTask(RLTask):
@@ -34,28 +38,8 @@ class BipedalTerrainTask(RLTask):
 
         # self.height_points = self.init_height_points()
         
-        # joint positions offsets
-        self.default_dof_pos = torch.zeros(
-            (self.num_envs, 12), dtype=torch.float, device=self.device, requires_grad=False
-        )
-        # reward episode sums
-        torch_zeros = lambda: torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)
-        self.episode_sums = {
-            "lin_vel_xy": torch_zeros(),
-            "lin_vel_z": torch_zeros(),
-            "ang_vel_z": torch_zeros(),
-            "ang_vel_xy": torch_zeros(),
-            "orient": torch_zeros(),
-            "torques": torch_zeros(),
-            "joint_acc": torch_zeros(),
-            # "base_height": torch_zeros(),
-            # "air_time": torch_zeros(),
-            # "collision": torch_zeros(),
-            # "stumble": torch_zeros(),
-            "action_rate": torch_zeros(),
-            "hip": torch_zeros(),
-            "step_pre": torch_zeros(),
-        }
+        
+        
         return
 
     def update_config(self, sim_config):
@@ -139,6 +123,7 @@ class BipedalTerrainTask(RLTask):
 
         self._task_cfg["sim"]["add_ground_plane"] = False
 
+
     def _get_noise_scale_vec(self, cfg):
         noise_vec = torch.zeros_like(self.obs_buf[0])
         self.add_noise = self._task_cfg["env"]["learn"]["addNoise"]
@@ -168,16 +153,26 @@ class BipedalTerrainTask(RLTask):
         self._stage = get_current_stage()
         self.get_terrain()
         self.get_robot()
+        # self.get_arraw()
         super().set_up_scene(scene, collision_filter_global_paths=["/World/terrain"])
         
         self._robots = BipedalView(
             prim_paths_expr="/World/envs/.*/Robot", name="robot_view",track_contact_forces=True
         )
+        # self.cylinder_fb_view =  GeometryPrimView(
+        #     prim_paths_expr="/World/envs/.*/cylinder_fb", name="cylinder_fb"
+        # )
+        # self.cylinder_set_view =  GeometryPrimView(
+        #     prim_paths_expr="/World/envs/.*/cylinder_set", name="cylinder_set"
+        # )
         scene.add(self._robots)
         scene.add(self._robots._knees)
         scene.add(self._robots._base)
         scene.add(self._robots._hip)
         scene.add(self._robots._feet)
+        # scene.add(self.cylinder_fb_view)
+        # scene.add(self.cylinder_set_view)
+        # self.set_arraw(torch.zeros((self.num_envs,3), device=self.device),torch.zeros((self.num_envs,3), device=self.device),torch.zeros((self.num_envs,3), device=self.device))
 
     def initialize_views(self, scene):
         # initialize terrain variables even if we do not need to re-create the terrain mesh
@@ -196,11 +191,20 @@ class BipedalTerrainTask(RLTask):
         self._robots = BipedalView(
             prim_paths_expr="/World/envs/.*/Robot", name="robot_view",track_contact_forces=True
         )
+        self.cylinder_fb_view =  GeometryPrimView(
+            prim_path=self.default_zero_env_path + "/cylinder_fb", name="cylinder_fb"
+        )
+        self.cylinder_set_view =  GeometryPrimView(
+            prim_path=self.default_zero_env_path + "/cylinder_set", name="cylinder_set"
+        )
+        self.set_arraw(torch.zeros((5,3)),torch.zeros((5,3)))
         scene.add(self._robots)
         scene.add(self._robots._knees)
         scene.add(self._robots._base)
         scene.add(self._robots._hip)
         scene.add(self._robots._feet)
+        scene.add(self.cylinder_fb_view)
+        scene.add(self.cylinder_set_view)
 
     def get_terrain(self, create_mesh=True):
         self.env_origins = torch.zeros((self.num_envs, 3), device=self.device, requires_grad=False)
@@ -230,8 +234,98 @@ class BipedalTerrainTask(RLTask):
         robot.set_anymal_properties(self._stage, robot.prim)
         robot.prepare_contacts(self._stage, robot.prim)
 
+    def get_arraw(self):
+        cylinder_fb = VisualCylinder(prim_path=self.default_zero_env_path + "/cylinder_fb",
+                            name="cylinder_fb",
+                            translation=np.array([0.0, 0.0, 1.0]),
+                            radius=0.005,
+                            height=1,
+                            color=np.array([1.0, 0.0, 0.0]))
+        cylinder_set = VisualCylinder(prim_path=self.default_zero_env_path + "/cylinder_set",
+                            name="cylinder_set",
+                            translation=np.array([0.0, 0.0, 1.0]),
+                            radius=0.005,
+                            height=1,
+                            color=np.array([0.0, 1.0, 0.0]))
+        return
+    def set_arraw(self,pos,spd,cmd):
+
+        spd_t = torch.zeros((self.num_envs,3),device=self.device)
+        spd_t[:,1] = spd[:,0]
+        spd_t[:,0] = -spd[:,1]
+        
+        # 归一化速度向量
+        norm_v = torch.norm(spd_t, dim=-1, keepdim=True)
+        unit_velocity = spd_t / (norm_v + 1e-8)  # 防止除以零
+
+        ones = torch.ones_like(unit_velocity[:, 0],device=self.device)
+        quaternion = torch.cat((ones.unsqueeze(1), unit_velocity), dim=1)
+
+        pos_t = torch.zeros_like(pos)
+        pos_t[:,0] = pos[:,0] + unit_velocity[:,1] * norm_v[:,0] /2
+        pos_t[:,1] = pos[:,1] - unit_velocity[:,0] * norm_v[:,0] /2 
+        pos_t[:,2] = pos[:,2] + 0.2
+        self.cylinder_fb_view.set_world_poses(pos_t,quaternion)
+
+        
+        scale = torch.ones((self.num_envs,3),device = self.device)
+        scale[:,2] = norm_v[:,0] /2
+        self.cylinder_fb_view.set_local_scales(scale)
+
+
+
+        cmd_b = quat_rotate(self.base_quat,cmd[:,0:3])
+        cmd_t = torch.zeros((self.num_envs,3),device=self.device)
+        cmd_t[:,1] = cmd_b[:,0]
+        cmd_t[:,0] = -cmd_b[:,1]
+        
+        # 归一化速度向量
+        norm_v = torch.norm(cmd_t, dim=-1, keepdim=True)
+        unit_velocity = cmd_t / (norm_v + 1e-8)  # 防止除以零
+
+        ones = torch.ones_like(unit_velocity[:, 0],device=self.device)
+        quaternion = torch.cat((ones.unsqueeze(1), unit_velocity), dim=1)
+
+        pos_t[:,0] = pos[:,0] + unit_velocity[:,1] * norm_v[:,0]/2
+        pos_t[:,1] = pos[:,1] - unit_velocity[:,0] * norm_v[:,0]/2
+        pos_t[:,2] = pos[:,2] + 0.2
+        self.cylinder_set_view.set_world_poses(pos_t,quaternion)
+        
+        scale = torch.ones((self.num_envs,3),device = self.device)
+        scale[:,2] = norm_v[:,0] / 2
+        self.cylinder_set_view.set_local_scales(scale)
+
+        
+        return
+    
+    
 
     def post_reset(self):
+
+        # reward episode sums
+        torch_zeros = lambda: torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)
+        
+        self.episode_sums = {
+            "lin_vel_xy": torch_zeros(),
+            "lin_vel_z": torch_zeros(),
+            "ang_vel_z": torch_zeros(),
+            "ang_vel_xy": torch_zeros(),
+            "orient": torch_zeros(),
+            "torques": torch_zeros(),
+            "joint_acc": torch_zeros(),
+            # "base_height": torch_zeros(),
+            # "air_time": torch_zeros(),
+            # "collision": torch_zeros(),
+            # "stumble": torch_zeros(),
+            "action_rate": torch_zeros(),
+            "hip": torch_zeros(),
+            "step_pre": torch_zeros(),
+        }
+        # joint positions offsets
+        self.default_dof_pos = torch.zeros(
+            (self.num_envs, 12), dtype=torch.float, device=self.device, requires_grad=False
+        )
+
         ctrl_dof_paths = ["lhipJoint","lf1Joint","lb1Joint","rhipJoint","rf1Joint","rb1Joint"]
         self.ctrl_dof_idx = torch.tensor(
             [self._robots._dof_indices[j] for j in ctrl_dof_paths], device=self._device, dtype=torch.long
@@ -369,6 +463,9 @@ class BipedalTerrainTask(RLTask):
         self.base_velocities = self._robots.get_velocities(clone=False)
         self.knee_pos, self.knee_quat = self._robots._knees.get_world_poses(clone=False)
 
+        # self.set_arraw(self.base_pos,self.base_velocities,self.commands)
+
+
     def pre_physics_step(self, actions):
         if not self.world.is_playing():
             return
@@ -380,6 +477,8 @@ class BipedalTerrainTask(RLTask):
         # print(action_clip)
         action_clip[:,[0,3]] = 0.166*action_clip[:,[0,3]]
 
+        # print(f"action_clip:{action_clip}")
+        # print(f"obs_buf:{self.obs_buf}")
         # print(self.def_pos)
         for i in range(self.decimation):
             if self.world.is_playing():
@@ -403,7 +502,6 @@ class BipedalTerrainTask(RLTask):
 
     def post_physics_step(self):
         self.progress_buf[:] += 1
-
         if self.world.is_playing():
 
             self.refresh_dof_state_tensors()
@@ -449,6 +547,7 @@ class BipedalTerrainTask(RLTask):
         self._robots.set_velocities(self.base_velocities)
 
     def refreshCommand(self,re_idx):
+
         self.commands[re_idx, 0] = torch_rand_float(
             self.command_x_range[0], self.command_x_range[1], (len(re_idx), 1), device=self.device
         ).squeeze()
